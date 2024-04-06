@@ -44,7 +44,7 @@ msal==1.28.0
 msrest==0.7.1
 multidict==6.0.5
 multipledispatch==1.0.0
-networkx==3.2.1
+networkx
 ninja==1.11.1.1
 numpy==1.26.4
 oauthlib==3.2.2
