@@ -82,4 +82,4 @@ ujson==5.9.0
 urllib3==1.26.18
 Werkzeug==3.0.1
 yarl==1.9.4
-openai==0.28.0
+openai
