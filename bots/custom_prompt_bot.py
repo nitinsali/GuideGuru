@@ -8,7 +8,8 @@ import json
 import easyocr
 import openai
 import json
-import asyncio
+import requests
+
 from datetime import datetime, timedelta
 
 from recognizers_number import recognize_number, Culture
@@ -30,9 +31,10 @@ from botbuilder.schema import (
     Activity,
     CardImage,HeroCard, ChannelAccount, CardAction
 )
-
+from config import DefaultConfig
 from data_models import ConversationFlow, Question, UserProfile
 
+CONFIG = DefaultConfig()
 
 class ValidationResult:
     def __init__(
@@ -247,6 +249,8 @@ class CustomPromptBot(ActivityHandler):
                 # response_message = MessageFactory.text("You have wonderful skill set")
 
                 try:
+                   await turn_context.send_activity("I'm analyzing you CV. Kindly wait...!")
+                  
                     # Perform OCR, predict categories, and career choices
                    await self._perform_ocr_and_predict_categories(image_path, flow, profile, turn_context)
                 except Exception as e:
@@ -341,18 +345,53 @@ class CustomPromptBot(ActivityHandler):
         # Concatenate extracted text into a single string
         extracted_text = ' '.join([detection[1] for detection in result])
 
-
         prompt = f"From the given below text (OCR model predicted text), give me two categories in pointers; one reflecting Skillset of a person and the other with certifications. Mention all the skills and certifications under respective categories without missing any. Keep it crisp and on point. The text is: {extracted_text}"
+       
+        # explanation = openai.chat.completions.create(
+        # model='gpt-3.5-turbo',
+        # messages=[
+        #     {"role":"system", "content": f"{prompt}"}
+        # ]
+        # )
+
+        #Azure OPEN       
+
+        headers = {
+            "Content-Type": "application/json",
+            "api-key": f"{CONFIG.GPT4V_KEY}",
+        }
         
-        explanation = openai.chat.completions.create(
-        model='gpt-3.5-turbo',
-        messages=[
-            {"role":"system", "content": f"{prompt}"}
-        ]
-        )
+        # Payload for the request
+        payload = {
+        "messages": [
+            {
+            "role": "system",
+            "content": [
+                {
+                "type": "text",
+                "text": f"{prompt}"
+                }
+            ]
+            }
+        ],
+        "temperature": 0.7,
+        "top_p": 0.95,
+        "max_tokens": 800
+        }
+
+        # Send request
+        try:
+            response = requests.post(CONFIG.GPT4V_ENDPOINT, headers=headers, json=payload)
+            response.raise_for_status()  # Will raise an HTTPError if the HTTP request returned an unsuccessful status code
+        except requests.RequestException as e:
+            raise SystemExit(f"Failed to make the request. Error: {e}")
+
+
+        #Azure OPEN AI
 
         # Get predicted categories
-        predicted_categories = explanation.choices[0].message.content.strip().split('\n')
+        parsedjson = json.loads(response.text)
+        predicted_categories = parsedjson['choices'][0]['message']['content'].strip().split('\n')        
 
         # Extract skillset from predicted categories
         skillset = [category.strip() for category in predicted_categories[0].split(':')[1].split(',')]
@@ -369,15 +408,52 @@ class CustomPromptBot(ActivityHandler):
        # Call OpenAI to predict career choices
         career_prediction_prompt = f"Given the domain of interest '{domain_of_interest}' and the extracted skillset '{', '.join(skillset)}', predict potential career choices."
 
-        career_prediction_explanation = openai.chat.completions.create(
-        model='gpt-3.5-turbo',
-        messages=[
-            {"role":"system", "content": f"{career_prediction_prompt}"}
-        ]
-        )
+        # career_prediction_explanation = openai.chat.completions.create(
+        # model='gpt-3.5-turbo',
+        # messages=[
+        #     {"role":"system", "content": f"{career_prediction_prompt}"}
+        # ]
+        # )
 
+        #Azure OPEN       
+
+        headers = {
+            "Content-Type": "application/json",
+            "api-key": f"{CONFIG.GPT4V_KEY}",
+        }
+        
+        # Payload for the request
+        payload = {
+        "messages": [
+            {
+            "role": "system",
+            "content": [
+                {
+                "type": "text",
+                "text": f"{career_prediction_prompt}"
+                }
+            ]
+            }
+        ],
+        "temperature": 0.7,
+        "top_p": 0.95,
+        "max_tokens": 800
+        }
+
+        # Send request
+        try:
+            response = requests.post(CONFIG.GPT4V_ENDPOINT, headers=headers, json=payload)
+            response.raise_for_status()  # Will raise an HTTPError if the HTTP request returned an unsuccessful status code
+        except requests.RequestException as e:
+            raise SystemExit(f"Failed to make the request. Error: {e}")
+
+
+        #Azure OPEN AI
+
+        parsedjson = json.loads(response.text)
         # Get career predictions
-        career_predictions = career_prediction_explanation.choices[0].message.content.strip().split('\n')
+        #career_predictions = career_prediction_explanation.choices[0].message.content.strip().split('\n')
+        career_predictions =parsedjson['choices'][0]['message']['content'].strip().split('\n')
         
         # print("\nPredicted Career Choices:")
         if career_predictions:
