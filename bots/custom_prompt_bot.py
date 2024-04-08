@@ -33,6 +33,8 @@ from botbuilder.schema import (
 )
 from config import DefaultConfig
 from data_models import ConversationFlow, Question, UserProfile
+from azure.storage.blob import BlobServiceClient, generate_blob_sas, BlobSasPermissions  
+from datetime import datetime, timedelta 
 
 CONFIG = DefaultConfig()
 
@@ -245,14 +247,16 @@ class CustomPromptBot(ActivityHandler):
             if "filename" in attachment_info:
                 # Path to your JPG image
                 image_path = attachment_info['local_path']
+                image_name = attachment_info['filename']
                 
+                imageSASuri = await self._upload_image_to_blob_and_generate_sas(image_name, image_path)
                 # response_message = MessageFactory.text("You have wonderful skill set")
 
                 try:
-                   await turn_context.send_activity("I'm analyzing you CV. Kindly wait...!")
+                   await turn_context.send_activity("I'm assessing your CV. Please wait...!")
                   
                     # Perform OCR, predict categories, and career choices
-                   await self._perform_ocr_and_predict_categories(image_path, flow, profile, turn_context)
+                   await self._perform_ocr_and_predict_categories(imageSASuri, flow, profile, turn_context)
                 except Exception as e:
                     print(f"Error: {str(e)}")
                 
@@ -341,6 +345,8 @@ class CustomPromptBot(ActivityHandler):
         # Perform OCR using EasyOCR
         reader = easyocr.Reader(['en'])
         result = reader.readtext(image_path)
+        # result = reader.readtext("https://holmesbotstorage.blob.core.windows.net/botimagecontainer/Slide1.jpeg?sp=r&st=2024-04-08T15:51:39Z&se=2024-04-29T23:51:39Z&spr=https&sv=2022-11-02&sr=b&sig=aq6hxsp3nbxQ4QauZYEZRi6W60QDc3jqpDbBu5vBr3Q%3D")
+
 
         # Concatenate extracted text into a single string
         extracted_text = ' '.join([detection[1] for detection in result])
@@ -783,3 +789,37 @@ class CustomPromptBot(ActivityHandler):
             buttons=[],
         )
         return CardFactory.hero_card(card)
+
+    #Function to upload image to Azure Storage container and generate SAS link
+    async def _upload_image_to_blob_and_generate_sas(self, blob_name, file_path) -> str:  
+        try:  
+            account_name = CONFIG.STORAGEACCOUNT
+            account_key = CONFIG.STORAGEACCOUNTKEY
+            container_name = CONFIG.STORAGEACCOUNTCONTAINER            
+            
+             # Create the BlobServiceClient object  
+            blob_service_client = BlobServiceClient(account_url=f"https://{account_name}.blob.core.windows.net", credential=account_key)  
+  
+            # Get the blob client  
+            blob_client = blob_service_client.get_blob_client(container=container_name, blob=blob_name)  
+  
+            # Upload the image  
+            with open(file_path, "rb") as data:  
+                blob_client.upload_blob(data, overwrite=True)    
+    
+            # Generate SAS token for the blob  
+            sas_token = generate_blob_sas(account_name=account_name,  
+                                        container_name=container_name,  
+                                        blob_name=blob_name,  
+                                        account_key=account_key,  
+                                        permission=BlobSasPermissions(read=True),  
+                                        expiry=datetime.utcnow() + timedelta(hours=1))  # Token valid for 1 hour  
+    
+            # Generate the full URL + SAS token  
+            blob_url_with_sas = f"https://{account_name}.blob.core.windows.net/{container_name}/{blob_name}?{sas_token}"  
+    
+            return blob_url_with_sas  
+  
+        except Exception as e:  
+            print(f"Error occurred: {e}")  
+            return None  
