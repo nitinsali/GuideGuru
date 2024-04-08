@@ -15,3 +15,6 @@ class DefaultConfig:
     APP_PASSWORD = os.environ.get("MicrosoftAppPassword", "Hgc8Q~EIJVtFxhv50fdm~oSWLnkF3J.SghLYBcEd")
     GPT4V_ENDPOINT = os.environ.get("GPT4V_ENDPOINT", "https://holmes-genopenai.openai.azure.com/openai/deployments/gpt4-Vision/chat/completions?api-version=2024-02-15-preview")
     GPT4V_KEY = os.environ.get("GPT4V_KEY", "d36dbc6b61154c4c8ca62f2c2cc386a3")
+    STORAGEACCOUNT = os.environ.get("STORAGEACCOUNT", "guidegurustorage")
+    STORAGEACCOUNTKEY = os.environ.get("STORAGEACCOUNTKEY", "<secret>")
+    STORAGEACCOUNTCONTAINER = os.environ.get("STORAGEACCOUNTCONTAINER", "botcontainer")
